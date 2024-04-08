@@ -1,111 +1,126 @@
-#include <Arduino.h>
+/*
+ARDUINO UGV (DONKEY)
+TODO: Create movement hierarchy based on smallest distance value compared to treshold.
+Develop function to calculate rotation time for 45,90,125,180... etc degrees (based on motor speed);
+*/
 
-const float rx_1 = 6, rx_2 = 5, rx_3 = 3;
-const int tx_1 = 11, tx_2 = 10, tx_3 = 9;
-long d1, d2, d3;
-const int led_1 = 13, led_2 = 8, led_3 = 2;
+const int motor_1A = 12, motor_1B = 11; //Motor direction pins
+const int motor_2A = 10, motor_2B = 9;
+const int EN_1 = 13, EN_2 = 8; //Activate controllers
 
-const float treshold = 300.0;
+const int trig_1 = 2, trig_2 = 4, trig_3 = 6;
+const int echo_1 = 3, echo_2 = 5, echo_3 = 7;
 
-//flush pointers
-long* reads;
-int* tx_pins;
-int* rx_pins;
+const long treshold = 15;
+long dist_1, dist_2, dist_3;
 
-long readSensor(int triggerPin, int echoPin)
-{
-  pinMode(triggerPin, OUTPUT); 
-  digitalWrite(triggerPin, LOW);
+long pulseDist(int trig, int echo){
+  
+  pinMode(trig, OUTPUT);  // Clear the trigger
+  digitalWrite(trig, LOW);
   delayMicroseconds(2);
-  digitalWrite(triggerPin, HIGH);
+  // Sets the trigger pin to HIGH state for 10 microseconds
+  digitalWrite(trig, HIGH);
   delayMicroseconds(10);
-  digitalWrite(triggerPin, LOW);
-  pinMode(echoPin, INPUT);
-  return pulseIn(echoPin, HIGH) * 0.01723;
+  digitalWrite(trig, LOW);
+  pinMode(echo, INPUT);
+  // Reads the echo pin, and returns the sound wave travel time in microseconds
+  return pulseIn(echo, HIGH) * 0.0173;
 }
 
-void readSensorFlush(long *reads, int *rx_pins, int *tx_pins, int size_1, int size_2, int size_3){
-  
-  //int len_tx = sizeof(tx_pins) / sizeof(tx_pins[0]);
-  //int len_rx = sizeof(rx_pins) / sizeof(rx_pins[0]);
-  
-  for(int i = 0; i < size_2; i++){
-    if(reads[i] == NULL || rx_pins[i] == NULL || tx_pins == NULL){
-      	Serial.println("ARRAY IS NULL.");
-    }
-    else{
-      	reads[i] = readSensor(tx_pins[i], rx_pins[i]);
-    	Serial.println(rx_pins[i]);
-    	Serial.println(readSensor(tx_pins[i], rx_pins[i]));
-    }
-  }
-  /*
-  for(int i = 0; i < len_tx; i++){
-    pinMode(tx_pins[i], OUTPUT); //Clean all TX
-    digitalWrite(tx_pins[i], LOW);
-  }
-  
-  delayMicroseconds(2);
-  for(int i = 0; i < len_tx; i++){
-    digitalWrite(tx_pins[i], HIGH);
-  }
-  
-  delayMicroseconds(10);
-  for(int i = 0; i < len_tx; i++){
-    digitalWrite(tx_pins[i], LOW);
-  }
-  
-  for(int i = 0; i < len_rx; i++){
-    pinMode(rx_pins[i], INPUT);
-    reads[i] = pulseIn(rx_pins[i], HIGH) * 0.01723;
-    Serial.println(reads[i]);
-  } 
-  */
-}
-  
+
+
 void setup()
 {
+  pinMode(motor_1A, OUTPUT);
+  pinMode(motor_1B, OUTPUT);
+  pinMode(motor_2A, OUTPUT);
+  pinMode(motor_2B, OUTPUT);
+  pinMode(EN_1, OUTPUT);
+  pinMode(EN_2, OUTPUT);
+  
+  //Activate
+  
+  digitalWrite(EN_1, HIGH);
+  digitalWrite(EN_2, HIGH);
+  
   Serial.begin(9600);
-  
-  //Sensors
-  pinMode(tx_1, OUTPUT);
-  pinMode(tx_2, OUTPUT);
-  pinMode(tx_3, OUTPUT);
-  pinMode(rx_1, OUTPUT);
-  pinMode(rx_2, OUTPUT);
-  pinMode(rx_3, OUTPUT);
-  
-  //OUTPUTs
-  pinMode(led_1, OUTPUT);
-  pinMode(led_2, OUTPUT);
-  pinMode(led_3, OUTPUT);
-  int txs[] = {tx_1, tx_2, tx_3};
-  int rxs[] = {rx_1, rx_2, rx_3};
-  long rs[] = {d1, d2, d3};
-  
-  tx_pins = txs;
-  rx_pins = rxs;
-  reads = rs;
-
-  
 }
 
 void loop()
 {
-
-  readSensorFlush(reads, rx_pins, tx_pins, 3, 3, 3);
+  dist_1 = pulseDist(trig_1, echo_1);
+  dist_2 = pulseDist(trig_2, echo_2);
+  dist_3 = pulseDist(trig_3, echo_3);
   
-  if(d1 < treshold){
-    digitalWrite(led_1, HIGH);
-  } else digitalWrite(led_1, LOW);
+  Serial.println("\n d1: ");
+  Serial.println(dist_1);
   
-  if(d2 < treshold){
-    digitalWrite(led_2, HIGH);
-  } else digitalWrite(led_2, LOW);
+  Serial.println("\n d2: ");
+  Serial.println(dist_2);
   
-  if(d3 < treshold){
-    digitalWrite(led_3, HIGH);
-  } else digitalWrite(led_3, LOW);
-    
+  Serial.println("\n d3: ");
+  Serial.println(dist_3);
+  
+  
+  if(dist_2 < treshold || dist_1 < treshold && dist_3 < treshold){
+    reposition(10000);
+  }
+  else if(dist_1 < treshold){
+    rotateCounterClockwise(800);
+  }
+  else if(dist_3 < treshold){
+    rotateClockwise(800);
+  }
+  else{
+    moveForwards();
+  }
+  
+  delay(300);
 }
 
+
+void moveForwards(){
+  digitalWrite(motor_1A, HIGH);
+  digitalWrite(motor_1B, LOW);
+  digitalWrite(motor_2A, LOW);
+  digitalWrite(motor_2B, HIGH);
+}
+
+
+void moveBackwards(){
+  digitalWrite(motor_1A, LOW);
+  digitalWrite(motor_1B, HIGH);
+  digitalWrite(motor_2A, HIGH);
+  digitalWrite(motor_2B, LOW);
+}
+
+void reposition(unsigned long delay){
+  
+  for(int i = 0; i < delay; i += 100){
+    digitalWrite(motor_1A, LOW);
+  	digitalWrite(motor_1B, HIGH);
+  	digitalWrite(motor_2A, LOW);
+  	digitalWrite(motor_2B, HIGH);
+  }
+  
+  rotateClockwise(delay / 2);
+}
+
+void rotateClockwise(unsigned long delay){
+  for(int i = 0; i < delay; i += 100){
+    digitalWrite(motor_1A, LOW);
+  	digitalWrite(motor_1B, HIGH);
+  	digitalWrite(motor_2A, LOW);
+  	digitalWrite(motor_2B, LOW);
+  }
+}
+
+void rotateCounterClockwise(unsigned long delay){
+  for(int i = 0; i < delay; i+= 100){
+    digitalWrite(motor_1A, LOW);
+  	digitalWrite(motor_1B, LOW);
+  	digitalWrite(motor_2A, HIGH);
+  	digitalWrite(motor_2B, LOW);
+  }
+}
